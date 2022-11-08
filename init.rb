@@ -1,6 +1,6 @@
 require 'redmine'
 require 'dispatcher' unless Rails::VERSION::MAJOR >= 3
-require 'xlse_asset_helpers'
+require_relative 'lib/xlse_asset_helpers'
 begin
   require 'zip/zip'
 rescue LoadError
@@ -43,7 +43,7 @@ unless Redmine::Plugin.registered_plugins.keys.include?(XLSE_AssetHelpers::PLUGI
     requires_redmine :version_or_higher => '3.2.0'
   end
 
-  require 'xls_export_hooks'
+  require_relative 'lib/xls_export_hooks'
 end
 
 Mime::Type.register('application/vnd.ms-excel', :xls, %w(application/vnd.ms-excel)) unless defined?(Mime::XLS)

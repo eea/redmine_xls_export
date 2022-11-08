@@ -1,5 +1,5 @@
-require 'xlse_asset_helpers'
-require_dependency 'xls_export'
+require_relative '../../lib/xlse_asset_helpers'
+require_relative '../../lib/xls_export'
 begin
   require 'zip/zip'
 rescue LoadError

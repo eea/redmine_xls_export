@@ -1,4 +1,4 @@
-require 'xlse_asset_helpers'
+require_relative 'xlse_asset_helpers'
 
 class XLSExportHook < Redmine::Hook::ViewListener
   def view_issues_index_bottom(context={})
