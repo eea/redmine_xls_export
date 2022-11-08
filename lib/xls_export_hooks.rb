@@ -1,10 +1,10 @@
 require_relative 'xlse_asset_helpers'
 
-class XLSExportHook < Redmine::Hook::ViewListener
+class XlsExportHooks < Redmine::Hook::ViewListener
   def view_issues_index_bottom(context={})
     if context[:query].valid? && !context[:issues].empty?
       ret_str =''
-      ret_str << stylesheet_link_tag("xls_export.css", :plugin => XLSE_AssetHelpers::PLUGIN_NAME, :media => "screen")
+      ret_str << stylesheet_link_tag("xls_export.css", :plugin => XlseAssetHelpers::PLUGIN_NAME, :media => "screen")
       ret_str << '<p class="other-formats">' << l(:label_plugin_xlse_export_format)
       ret_str << content_tag('span', link_to(l(:label_plugin_xlse_export_format_quick),
                                              hook_url_for({ :controller => 'xls_export', :action => 'export_current', :project_id => context[:project] }),

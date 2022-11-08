@@ -21,6 +21,9 @@ module Redmine
   end
 end
 
+module XlsExport
+end
+
 module Redmine
   module Export
     module XLS

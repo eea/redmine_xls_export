@@ -1,4 +1,4 @@
-module XLSE_AssetHelpers
+module XlseAssetHelpers
 
   PLUGIN_NAME = File.expand_path('../../*', __FILE__).match(/.*\/(.*)\/\*$/)[1].to_sym
 

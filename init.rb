@@ -7,8 +7,8 @@ rescue LoadError
   ActionController::Base::logger.info 'XLS export controller: rubyzip gem not available'
 end
 
-unless Redmine::Plugin.registered_plugins.keys.include?(XLSE_AssetHelpers::PLUGIN_NAME)
-  Redmine::Plugin.register XLSE_AssetHelpers::PLUGIN_NAME do
+unless Redmine::Plugin.registered_plugins.keys.include?(XlseAssetHelpers::PLUGIN_NAME)
+  Redmine::Plugin.register XlseAssetHelpers::PLUGIN_NAME do
     name 'Issues XLS export'
     author 'Vitaly Klimov'
     author_url 'mailto:vitaly.klimov@snowbirdgames.com'
