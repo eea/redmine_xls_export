@@ -1,5 +1,5 @@
-require 'xlse_asset_helpers'
-require_dependency 'xls_export'
+require_relative '../../lib/xlse_asset_helpers'
+require_relative '../../lib/xls_export'
 begin
   require 'zip/zip'
 rescue LoadError
@@ -26,7 +26,11 @@ class XlsExportController < ApplicationController
   helper :custom_fields
   include CustomFieldsHelper
 
-  before_action :find_optional_project_xls
+  if respond_to? :before_action
+    before_action :find_optional_project_xls
+  else
+    before_filter :find_optional_project_xls
+  end
 
   def index
     @issues_export_offset=params[:issues_export_offset].to_i || 0
@@ -40,11 +44,11 @@ class XlsExportController < ApplicationController
         redirect_to :controller => 'issues', :action => 'index', :project_id => @project
       end
     end
-    @settings=XLSE_AssetHelpers::settings
+    @settings=XlseAssetHelpers::settings
   end
 
   def export_current
-    @settings=XLSE_AssetHelpers::settings
+    @settings=XlseAssetHelpers::settings
     @issues_export_offset=params[:issues_export_offset].to_i || 0
     if retrieve_xls_export_data(@settings)
       export_name = get_xls_export_name(@settings)
@@ -66,7 +70,7 @@ protected
 
   def query_issues(export_offset, limit)
     options = {:order => sort_clause, :offset => export_offset, :limit => limit}
-    if (Redmine::VERSION::MAJOR <= 3) && (Redmine::VERSION::MINOR <= 3) && (Redmine::VERSION::BRANCH != 'devel') then
+    if Redmine::VERSION.to_s.to_f < 3.3
       options.merge!({:include => [:assigned_to, :tracker, :priority, :category, :fixed_version]})
     end
     @query.issues(options)
@@ -96,7 +100,7 @@ protected
         @issues = query_issues(export_offset, limit)
 #        @issue_count_by_group = @query.issue_count_by_group
 # end of original code
-        @settings=XLSE_AssetHelpers::settings unless settings
+        @settings=XlseAssetHelpers::settings unless settings
       end
       return true
     end
@@ -139,7 +143,7 @@ protected
             rescue
               nil
             end
-            zip_stream.put_next_entry("#{file ? "#{ATTACHMENTS_FOLDER}/" : "#{NOT_FOUND_ATTACHMENTS_FOLDER}/"}%05i/#{create_zip_filename(attach)}" % [issue.id],nil,nil,Zip::ZipEntry::DEFLATED,Zlib::BEST_COMPRESSION)
+            zip_stream.put_next_entry("#{file ? "#{ATTACHMENTS_FOLDER}/" : "#{NOT_FOUND_ATTACHMENTS_FOLDER}/"}%d/#{create_zip_filename(attach)}" % [issue.id],nil,nil,Zip::ZipEntry::DEFLATED,Zlib::BEST_COMPRESSION)
             unless file
               file=StringIO.new('')
               file.write("\n")
@@ -151,7 +155,7 @@ protected
         if @settings['separate_journals'] == '1'
           journal_xls=journal_details_to_xls(issue, @settings)
           if journal_xls
-            zip_stream.put_next_entry("#{JOURNALS_FOLDER}/%05i_journal_details.xls" % [issue.id],nil,nil,Zip::ZipEntry::DEFLATED,Zlib::BEST_COMPRESSION)
+            zip_stream.put_next_entry("#{JOURNALS_FOLDER}/%d_journal_details.xls" % [issue.id],nil,nil,Zip::ZipEntry::DEFLATED,Zlib::BEST_COMPRESSION)
             zip_stream.write(journal_xls)
           end
         end

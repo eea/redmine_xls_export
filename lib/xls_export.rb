@@ -21,6 +21,9 @@ module Redmine
   end
 end
 
+module XlsExport
+end
+
 module Redmine
   module Export
     module XLS
@@ -218,7 +221,7 @@ module Redmine
 
       def insert_issue_id(row, issue)
         issue_url = url_for(:controller => 'issues', :action => 'show', :id => issue)
-        row << Spreadsheet::Link.new(URI.escape(issue_url), issue.id.to_s)
+        row << Spreadsheet::Link.new(ERB::Util.url_encode(issue_url), issue.id.to_s)
         format_link = Spreadsheet::Format.new :color => :blue, :underline => :single
         row.set_format(row.size - 1, format_link)
       end
@@ -228,6 +231,8 @@ module Redmine
 
         (options[:query_columns_only] == '1' ? query.columns : query.available_columns).each do |c|
           case c.name
+            when :description
+              next unless use_export_description_setting?(query, options)
             when :relations
               issue_columns << c if options[:relations] == '1'
             when :estimated_hours
@@ -396,9 +401,9 @@ module Redmine
           idx = idx + 1
 
           if options[:journal_worksheets]
-              journal_details_to_xls(issue, options, book)
+            journal_details_to_xls(issue, options, book)
           end
-          
+
         end
 
         if sheet1
@@ -420,15 +425,19 @@ module Redmine
 
         Spreadsheet.client_encoding = 'UTF-8'
         book = book_to_add ? book_to_add : Spreadsheet::Workbook.new
-        sheet1 = book.create_worksheet(:name => "%05i - Journal" % [issue.id])
+        sheet1 = book.create_worksheet(:name => "%d - Journal" % [issue.id])
 
         columns_width = []
         sheet1.row(0).replace []
-        ['#',l(:field_updated_on),l(:field_user),l(:label_details),l(:field_notes)].each do |c|
+        [l(:plugin_xlse_field_issue_id), '#', l(:field_updated_on),l(:field_user),l(:label_details),l(:field_notes)].each do |c|
           sheet1.row(0) << c
           columns_width << (get_value_width(c)*1.1)
         end
         sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
+        sheet1.column(1).default_format = Spreadsheet::Format.new(:number_format => "0")
+
+        date_formats = init_date_formats(options);
+        sheet1.column(2).default_format = Spreadsheet::Format.new(:number_format => date_formats[:updated_on])
 
         idx=0
         journals.each do |journal|
@@ -443,7 +452,7 @@ module Redmine
           details = strip_html(details, options)
           notes = strip_html(journal.notes? ? journal.notes.to_s : '', options)
 
-          [idx+1,localtime(journal.created_on),journal.user.name,details,notes].each_with_index do |e,e_idx|
+          [issue.id,idx+1,localtime(journal.created_on),journal.user.name,details,notes].each_with_index do |e,e_idx|
             lf_pos = get_value_width(e)
             columns_width[e_idx] = lf_pos unless columns_width[e_idx] >= lf_pos
             row << e
@@ -455,9 +464,9 @@ module Redmine
         update_sheet_formatting(sheet1,columns_width)
 
         if book_to_add.nil?
-            xls_stream = StringIO.new('')
-            book.write(xls_stream)
-            xls_stream.string
+          xls_stream = StringIO.new('')
+          book.write(xls_stream)
+          xls_stream.string
         end
       end
 
@@ -599,7 +608,8 @@ module Redmine
       def add_columns_header_for_status_histories(sheet)
         columns_width = []
         sheet.row(0).replace []
-        ['#', l(:field_project), l(:plugin_xlse_field_issue_created_on),  l(:field_updated_on),
+        ['#', l(:field_project), l(:field_author), l(:plugin_xlse_field_actor),
+         l(:field_assigned_to), l(:plugin_xlse_field_issue_created_on), l(:field_updated_on),
          l(:plugin_xlse_field_status_from), l(:plugin_xlse_field_status_to)].each do |c|
           sheet.row(0) << c
           columns_width << (get_value_width(c) * 1.1)
@@ -608,10 +618,10 @@ module Redmine
         return columns_width
       end
 
-      def set_columns_default_format(sheet, options)
+      def status_histories_columns_format(sheet, options)
         date_formats = init_date_formats(options);
 
-        number_formats = ['0', nil, date_formats[:created_on], date_formats[:updated_on], nil, nil]
+        number_formats = ['0', nil, nil, nil, nil, date_formats[:created_on], date_formats[:updated_on], nil, nil]
         format = Hash.new
         number_formats.each_with_index do |number_format, idx|
           format.clear
@@ -638,34 +648,121 @@ module Redmine
 
         idx = 0
         issues.each do |issue|
-          journals = get_visible_journals(issue)
-          journals.each do |journal|
-            journal.visible_details.each do |detail|
-              if detail.prop_key == "status_id"
-                row = sheet.row(idx+1)
-                row.replace []
 
-                project = issue.respond_to?(:project) ? issue.send(:project).name : issue.project_id.to_s
-                status_from = get_issue_status(detail.old_value, issue_statuses)
-                status_to = get_issue_status(detail.value, issue_statuses)
-                [issue.id, project, localtime(issue.created_on), localtime(journal.created_on), status_from, status_to].each_with_index do |e, e_idx|
-                  lf_pos = get_value_width(e)
-                  columns_width[e_idx] = lf_pos unless columns_width[e_idx] >= lf_pos
-                  row << e
-                end
-                idx = idx+1
-              end
+          issue_updates = issue.journals.
+            joins(:details).includes(:user).
+            where(journal_details: {prop_key: %w( status_id assigned_to_id )}).
+            order(:created_on).uniq.to_a
+
+          next if issue_updates.size == 0
+
+          assignees_timeline = status_histories_assignee_timeline(issue, issue_updates)
+
+          issue_updates.each.with_index do |journal, i|
+            row = sheet.row(idx+1)
+            row.replace []
+
+            project = issue.respond_to?(:project) ? issue.project.name : issue.project_id.to_s
+
+            author = issue.author.to_s
+            actor = journal.user.to_s
+            as_at_assignee = assignees_timeline.find do |from, to|
+              from < journal.created_on && to >= journal.created_on
             end
+
+            as_at_assignee = as_at_assignee ? as_at_assignee.last : issue.assigned_to
+
+            status_change = journal.details.find {|j| j.prop_key == 'status_id' }
+            if status_change
+              status_histories_add_fields(row, columns_width,
+                issue, project, author, actor, as_at_assignee,
+                issue.created_on, journal.created_on,
+                get_issue_status(status_change.old_value, issue_statuses),
+                get_issue_status(status_change.value, issue_statuses)
+              )
+
+              idx = idx+1
+            end
+
+            assignee_change = journal.details.find {|j| j.prop_key == 'assigned_to_id' }
+
+            if !status_change && assignee_change
+              previous_row = sheet.row(idx-1)
+              old_status = # Get it from the spreadsheet's previous row. Ugly hack but effective.
+                if previous_row && previous_row[0].to_s == issue.id.to_s
+                  previous_row[-1]
+                else
+                  'New' #FIXME
+                end
+
+              status_histories_add_fields(row, columns_width,
+                issue, project, author, actor, as_at_assignee,
+                issue.created_on, journal.created_on,
+                old_status, old_status
+              )
+
+              idx = idx+1
+            end
+
           end
         end
 
         return columns_width
       end
 
+      def status_histories_add_fields(row, columns_width, issue, project, author, actor, assignee, created, updated, status_from, status_to)
+        [issue.id, project, author.to_s, actor.to_s, assignee.to_s,
+         localtime(created), localtime(updated),
+         status_from, status_to].each.with_index do |field, i|
+
+          lf_pos = get_value_width(field)
+          columns_width[i] = lf_pos unless columns_width[i] >= lf_pos
+          row << field
+        end
+      end
+
+      # Extract an array of [ from, to, assignee ] elements from the
+      # assignee changes journals.
+      #
+      def status_histories_assignee_timeline(issue, issue_updates)
+        assignee_changes = issue_updates.inject([]) do |assignees, journal|
+          assignee_change = journal.details.select {|d| d.prop_key == 'assigned_to_id'}
+          assignee_change = assignee_change.map do |d|
+            old_assignee = d.old_value.present? ? Principal.find(d.old_value) : 'nobody'
+            new_assignee = d.value.present? ? Principal.find(d.value) : 'nobody'
+
+            [journal.created_on, old_assignee, new_assignee]
+          end
+
+          assignees.concat(assignee_change)
+        end
+
+        assignee_changes.each.with_index.inject([]) do |ret, ((at, a1, a2), i)|
+          # On the first assignee change, mark the old assignee from the
+          # issue creation date until this change happened.
+          if i == 0
+            from = i == 0 ? issue.created_on : assignee_changes[i-1].first
+            ret.push([from, at, a1])
+          end
+
+          # Add the assignee from now...
+          from = at
+          # ... until the next entry.
+          to = assignee_changes[i+1]
+          # if it's the last, then until now.
+          to = to ? to.first : DateTime.now
+
+          ret.push([from, to, a2])
+
+          ret
+        end
+      end
+
+
       def status_histories_to_xls(issues, options = {})
         book, sheet = init_status_histories_book()
         columns_width = add_columns_header_for_status_histories(sheet)
-        set_columns_default_format(sheet, options)
+        status_histories_columns_format(sheet, options)
         columns_width = extract_status_histories(sheet, columns_width, issues)
 
         update_sheet_formatting(sheet, columns_width)
