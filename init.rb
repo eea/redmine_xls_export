@@ -10,11 +10,11 @@ end
 unless Redmine::Plugin.registered_plugins.keys.include?(XlseAssetHelpers::PLUGIN_NAME)
   Redmine::Plugin.register XlseAssetHelpers::PLUGIN_NAME do
     name 'Issues XLS export'
-    author 'Vitaly Klimov'
-    author_url 'mailto:vitaly.klimov@snowbirdgames.com'
+    author 'EEA'
     description 'Export issues to XLS files including journals, descriptions, etc. This plugin requires spreadsheet gem.'
-    version '0.2.1.t11'
-
+    version '0.3.0'
+    url 'http://github.com/eea/redmine_xls_export'
+    
     settings(:partial => 'settings/xls_export_settings',
              :default => {
                'relations' => '1',
