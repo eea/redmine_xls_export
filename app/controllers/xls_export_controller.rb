@@ -7,7 +7,6 @@ rescue LoadError
 end
 
 class XlsExportController < ApplicationController
-  unloadable
 
   ZIP_FILENAMES_ENCODING = 'cp866'
   ZIP_FILENAMES_ENCODING_FALLBACK = 'cp850'

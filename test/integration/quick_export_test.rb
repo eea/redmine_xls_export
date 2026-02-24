@@ -46,6 +46,7 @@ class QuickExportTest < Redmine::IntegrationTest
   end
 
   def teardown
+    Setting["plugin_redmine_xls_export"] = Redmine::Plugin.find(:redmine_xls_export).settings[:default].dup
   end
 
   def test_quick_link_is_in_issues_page
