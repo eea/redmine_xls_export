@@ -12,7 +12,7 @@ unless Redmine::Plugin.registered_plugins.keys.include?(XlseAssetHelpers::PLUGIN
     name 'Issues XLS export'
     author 'EEA'
     description 'Export issues to XLS files including journals, descriptions, etc. This plugin requires spreadsheet gem.'
-    version '0.3.0'
+    version '0.4.0'
     url 'http://github.com/eea/redmine_xls_export'
     
     settings(:partial => 'settings/xls_export_settings',

@@ -153,7 +153,6 @@ module Redmine
     module XLS
       include Redmine::Export::XLS::StripHTML
       include Redmine::Export::XLS::Journals
-      unloadable
 
       def show_value_for_xls(value)
         if CustomFieldsHelper.instance_method(:show_value).arity == 1

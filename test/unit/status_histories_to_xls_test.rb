@@ -29,7 +29,8 @@ class StatusHistoriesToXlsTest < ActiveSupport::TestCase
     book, sheet = init_status_histories_book()
     columns_width = add_columns_header_for_status_histories(sheet)
 
-    header = ['#', l(:field_project), l(:plugin_xlse_field_issue_created_on), l(:field_updated_on),
+    header = ['#', l(:field_project), l(:field_author), l(:plugin_xlse_field_actor),
+              l(:field_assigned_to), l(:plugin_xlse_field_issue_created_on), l(:field_updated_on),
               l(:plugin_xlse_field_status_from), l(:plugin_xlse_field_status_to)]
     row = sheet.row(0)
     i = 0
@@ -43,30 +44,35 @@ class StatusHistoriesToXlsTest < ActiveSupport::TestCase
   def test_to_set_default_format_for_columns
     book, sheet = init_status_histories_book()
     columns_width = add_columns_header_for_status_histories(sheet)
-    set_columns_default_format(sheet, {:updated_format => 'dd.mm.yyyy hh:mm:ss'})
+    status_histories_columns_format(sheet, {:updated_format => 'dd.mm.yyyy hh:mm:ss'})
 
     assert_equal '0', sheet.column(0).default_format.number_format
     assert_equal 'GENERAL', sheet.column(1).default_format.number_format
-    assert_equal 'dd.mm.yyyy hh:mm:ss', sheet.column(2).default_format.number_format
-    assert_equal 'dd.mm.yyyy hh:mm:ss', sheet.column(3).default_format.number_format
+    assert_equal 'GENERAL', sheet.column(2).default_format.number_format
+    assert_equal 'GENERAL', sheet.column(3).default_format.number_format
     assert_equal 'GENERAL', sheet.column(4).default_format.number_format
-    assert_equal 'GENERAL', sheet.column(5).default_format.number_format
+    assert_equal 'dd.mm.yyyy hh:mm:ss', sheet.column(5).default_format.number_format
+    assert_equal 'dd.mm.yyyy hh:mm:ss', sheet.column(6).default_format.number_format
+    assert_equal 'GENERAL', sheet.column(7).default_format.number_format
+    assert_equal 'GENERAL', sheet.column(8).default_format.number_format
   end
 
   def test_to_export_status_histories
     book, sheet = init_status_histories_book()
     columns_width = add_columns_header_for_status_histories(sheet)
-    set_columns_default_format(sheet, {:updated_format => 'dd.mm.yyyy hh:mm:ss'})
+    status_histories_columns_format(sheet, {:updated_format => 'dd.mm.yyyy hh:mm:ss'})
 
     extract_status_histories(sheet, columns_width, Issue.all.to_a)
 
     # row 1
     assert_equal 1, sheet.row(1)[0]
     assert_equal 'eCookbook', sheet.row(1)[1]
-    assert_equal Issue.find(1).created_on, sheet.row(1)[2]
-    assert_equal Journal.find(1).created_on, sheet.row(1)[3]
-    assert_equal 'New', sheet.row(1)[4]
-    assert_equal 'Assigned', sheet.row(1)[5]
+    assert_equal Issue.find(1).author.to_s, sheet.row(1)[2]
+    assert_equal Journal.find(1).user.to_s, sheet.row(1)[3]
+    assert_equal localtime(Issue.find(1).created_on), sheet.row(1)[5]
+    assert_equal localtime(Journal.find(1).created_on), sheet.row(1)[6]
+    assert_equal 'New', sheet.row(1)[7]
+    assert_equal 'Assigned', sheet.row(1)[8]
 
     columns_width.each do |width|
       assert width > 0
